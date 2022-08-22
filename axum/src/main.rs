@@ -9,43 +9,49 @@ use axum::{
     extract,
     http::StatusCode,
     response::{Html, IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
     Router,
 };
-use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use serde::Deserialize;
+
+
+// define the templates
+#[derive(Template)]
+#[template(path = "index.html")]
+struct HelloTemplate {
+    username: String,
+}
+
+async fn greet(extract::Path(username): extract::Path<String>) -> impl IntoResponse {
+    let template = HelloTemplate { username };
+    HtmlTemplate(template)
+}
+
+
+
+#[derive(Deserialize)]
+struct LoginData {
+    username: String,
+    password: String,
+}
+
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::new(
-            std::env::var("RUST_LOG").unwrap_or_else(|_| "example_templates=debug".into()),
-        ))
-        .with(tracing_subscriber::fmt::layer())
-        .init();
 
     // build our application with some routes
-    let app = Router::new().route("/greet/:name", get(greet));
+    let app = Router::new()
+        .route("/greet/:username", get(greet));
+
 
     // run it
-    let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
-    tracing::debug!("listening on {}", addr);
-    axum::Server::bind(&addr)
+    axum::Server::bind(&"127.0.0.1:8080".parse().unwrap())
         .serve(app.into_make_service())
         .await
         .unwrap();
 }
 
-async fn greet(extract::Path(name): extract::Path<String>) -> impl IntoResponse {
-    let template = HelloTemplate { name };
-    HtmlTemplate(template)
-}
-
-#[derive(Template)]
-#[template(path = "hello.html")]
-struct HelloTemplate {
-    name: String,
-}
 
 struct HtmlTemplate<T>(T);
 
@@ -64,3 +70,4 @@ where
         }
     }
 }
+
